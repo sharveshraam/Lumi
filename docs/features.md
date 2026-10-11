@@ -168,9 +168,17 @@ presses Stop mid-stream; and a network pull that is cancelled.
 
 ## 13. Testing and documentation
 
-* 351 automated tests (1 skipped: a Windows-only notification test), run
+* 354 automated tests (1 skipped: a Windows-only notification test), run
   offline with no model, no network and no display.
-* `pytest -q` → `351 passed, 1 skipped`.
+* `python scripts/smoke_test.py` starts the whole application headlessly,
+  touches every page, creates a task and a note, takes a briefing, flips into
+  compact mode and shuts down - a check that the parts are wired to each other.
+* One file of them (`test_ollama_integration.py`) starts a real HTTP server on
+  loopback that answers like Ollama, and drives the real client and assistant
+  against it: streaming, stopping mid-stream, a failed pull, a model that
+  reports "requires more system memory", a model that asks for a tool, and the
+  exact system prompt that reaches the model.
+* `pytest -q` → `354 passed, 1 skipped`.
 * Manual acceptance checklist: [acceptance.md](acceptance.md).
 * Build instructions: [packaging.md](packaging.md).
 

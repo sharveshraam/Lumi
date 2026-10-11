@@ -26,6 +26,14 @@ from lumi.tools.base import StopToken
 MODEL = "llama3.2:3b"
 
 
+#: The last payload each route received, so tests can inspect the real request.
+CAPTURED: dict[str, dict[str, Any]] = {}
+
+
+def _captured_payload() -> dict[str, dict[str, Any]]:
+    return CAPTURED
+
+
 class _Handler(BaseHTTPRequestHandler):
     """A tiny stand-in for ``ollama serve``."""
 
@@ -99,6 +107,7 @@ class _Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802 - http.server naming
         path = self.path.split("?")[0]
         payload = self._read_json()
+        CAPTURED[path.rsplit("/", 1)[-1]] = payload
 
         if path == "/api/show":
             self._send_json(
@@ -368,3 +377,54 @@ def test_the_fast_path_answers_without_the_model(engine, tool_context, tasks) ->
     assert reply.deterministic is True
     assert reply.model in ("", "none", "builtin")
     assert tasks.list(status="open"), "the task was created without a model"
+
+
+# ---------------------------------------------------------------------------
+# what actually reaches the model
+# ---------------------------------------------------------------------------
+def test_the_request_carries_the_rules_lumi_promises(engine, tool_context) -> None:
+    """The study and coding rules must be in the request, not just in a file.
+
+    This inspects the payload the client really sent to the server, so a prompt
+    that stops being wired up fails here rather than quietly changing behaviour.
+    """
+    payload = _captured_payload()
+    payload.clear()
+
+    engine.send("explain how a low-pass filter works", tool_context=tool_context)
+
+    request = payload.get("chat") or {}
+    messages = request.get("messages") or []
+    assert messages, "the request carried messages"
+    system = messages[0]
+    assert system.get("role") == "system"
+    text = system.get("content") or ""
+
+    # study help: hints first, worked solution on request
+    assert "Socratic" in text
+    assert "worked solution" in text
+    # coding: never claim something ran when it did not
+    assert "never claim" in text.lower()
+    # honesty about the model itself
+    assert "not sure" in text.lower() or "uncertain" in text.lower()
+    # the user's own words are the last message
+    assert messages[-1]["role"] == "user"
+    assert "low-pass filter" in messages[-1]["content"]
+
+
+def test_the_request_says_it_is_local_only(engine, tool_context) -> None:
+    payload = _captured_payload()
+    payload.clear()
+    engine.send("hello there", tool_context=tool_context)
+    text = (payload["chat"].get("messages") or [{}])[0].get("content", "")
+    assert "on this computer" in text.lower()
+    assert payload["chat"].get("model") == MODEL
+
+
+def test_memories_are_put_in_front_of_the_model(engine, tool_context, memory) -> None:
+    memory.add("Prefers metric units and SI prefixes", kind="preference")
+    payload = _captured_payload()
+    payload.clear()
+    engine.send("how long is a wavelength of 100 MHz?", tool_context=tool_context)
+    text = (payload["chat"].get("messages") or [{}])[0].get("content", "")
+    assert "metric" in text.lower(), "a saved preference reaches the model"
