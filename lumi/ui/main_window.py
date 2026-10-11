@@ -196,7 +196,16 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------- global hotkey
     def _build_shortcuts(self) -> None:
+        """Bind Stop in two ways: system-wide where possible, in-app always.
+
+        The global hotkey is what makes Stop an emergency stop - it works while
+        another application has the keyboard.  The in-app shortcut stays as the
+        fallback, so the button's promise never depends on a registration that
+        the operating system may refuse.
+        """
         stop_keys = self.services.settings_store.settings.automation.emergency_stop_hotkey
+        self.stop_hotkey = self._register_global_stop(stop_keys)
+
         shortcut = QShortcut(QKeySequence(stop_keys), self)
         shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
         shortcut.activated.connect(self.emergency_stop)
@@ -212,6 +221,28 @@ class MainWindow(QMainWindow):
             talk = QShortcut(QKeySequence(focus_keys), self)
             talk.setContext(Qt.ShortcutContext.ApplicationShortcut)
             talk.activated.connect(self._push_to_talk)
+
+    def _register_global_stop(self, combination: str):
+        """Try to own the Stop key system-wide; report honestly if we cannot."""
+        from lumi.ui.hotkeys import GlobalHotkey
+
+        hotkey = GlobalHotkey(combination, self._stop_from_anywhere)
+        if hotkey.register():
+            self.stop_button.setToolTip(
+                f"Stops any running action immediately. Global hotkey: {combination}"
+            )
+            return hotkey
+        log.info("global emergency stop unavailable: %s", hotkey.reason)
+        self.stop_button.setToolTip(
+            f"Stops any running action immediately. Shortcut (while LUMI is focused): "
+            f"{combination}.\nGlobal hotkey unavailable: {hotkey.reason}"
+        )
+        return None
+
+    def _stop_from_anywhere(self) -> None:
+        """Called by Windows, on the Qt thread, when the global hotkey fires."""
+        log.info("emergency stop triggered by the global hotkey")
+        self.emergency_stop()
 
     def _push_to_talk(self) -> None:
         """First press records, second press transcribes and fills the box."""
@@ -461,6 +492,13 @@ class MainWindow(QMainWindow):
 
     def force_quit(self) -> None:
         self._quitting = True
+        hotkey = getattr(self, "stop_hotkey", None)
+        if hotkey is not None:
+            try:
+                hotkey.unregister()
+            except Exception:  # noqa: BLE001
+                log.debug("could not release the global hotkey", exc_info=True)
+            self.stop_hotkey = None
         try:
             self.services.app.request_stop()
         except Exception:  # noqa: BLE001

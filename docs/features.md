@@ -13,7 +13,7 @@ promise, it is what is missing today.
 | Chat with a local Ollama model, streamed token by token | ✅ |
 | Model selector in the header, live status (running / loading / offline) | ✅ |
 | **Local only** badge whenever a local model is answering | ✅ |
-| Stop button and global hotkey that cancel the stream mid-sentence | ✅ |
+| Stop button and global hotkey (`Ctrl+Alt+Shift+S`) that cancel the stream mid-sentence | ✅ Windows registers it system-wide; the in-app shortcut is the fallback |
 | Conversation history in SQLite, new chat (`Ctrl+N`), search, rename, delete | ✅ |
 | Tool-activity panel showing every tool call and its result as it happens | ✅ |
 | Model recommendations from your actual RAM/VRAM | ✅ |
@@ -168,7 +168,7 @@ presses Stop mid-stream; and a network pull that is cancelled.
 
 ## 13. Testing and documentation
 
-* 354 automated tests (1 skipped: a Windows-only notification test), run
+* 358 automated tests (1 skipped: a Windows-only notification test), run
   offline with no model, no network and no display.
 * `python scripts/smoke_test.py` starts the whole application headlessly,
   touches every page, creates a task and a note, takes a briefing, flips into
@@ -178,7 +178,7 @@ presses Stop mid-stream; and a network pull that is cancelled.
   against it: streaming, stopping mid-stream, a failed pull, a model that
   reports "requires more system memory", a model that asks for a tool, and the
   exact system prompt that reaches the model.
-* `pytest -q` → `354 passed, 1 skipped`.
+* `pytest -q` → `358 passed, 1 skipped`.
 * Manual acceptance checklist: [acceptance.md](acceptance.md).
 * Build instructions: [packaging.md](packaging.md).
 
@@ -197,9 +197,9 @@ presses Stop mid-stream; and a network pull that is cancelled.
 6. **Empty result sets are explicit.** "Duplicate scan found nothing" is always a
    statement about a folder LUMI could read.
 7. **Windows-only paths are tested but not run on Windows here.** The
-   accessibility, notification and Startup-folder paths are covered by unit
-   tests on Linux; they have not been exercised on a real Windows machine in
-   this development environment.
+   accessibility, notification, Startup-folder and system-wide-hotkey paths are
+   covered by unit tests on Linux; they have not been exercised on a real
+   Windows machine in this development environment.
 8. **Voice is unverified here** (no microphone, no speaker, no model downloaded).
 9. **Desktop automation on Linux/macOS** is a no-op backend with a clear status.
 10. **The database is not encrypted.** Protect it with BitLocker/EFS if it

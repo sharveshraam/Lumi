@@ -118,9 +118,11 @@ The Stop button cancels between steps: a tool that is already inside a blocking
 Windows API call finishes that call first. Long operations (a model download, a
 big file scan) check the stop flag themselves and stop within a second.
 
-If even the button is unresponsive, use the global hotkey
-(`Ctrl+Alt+Shift+S` by default) — it works from inside any application. If the
-whole UI is frozen, quit from the tray icon.
+If even the button is unresponsive, use the hotkey (`Ctrl+Alt+Shift+S` by
+default). On Windows LUMI registers it with the operating system, so it works
+from inside any application; if Windows refused the combination (another program
+already uses it) the tooltip on the Stop button says so, and the shortcut still
+works while LUMI is focused. If the whole UI is frozen, quit from the tray icon.
 
 ### "That application is not available"
 

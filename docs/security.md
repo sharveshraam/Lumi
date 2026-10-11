@@ -129,8 +129,12 @@ Rules:
   stream. A tool that is already inside a blocking Windows call finishes that
   call; anything with a loop checks the flag (and the file scanner, model
   puller and recorder check it often).
-* A global hotkey (`Ctrl+Alt+Shift+S` by default) stops everything, even when
-  LUMI is not the focused window.
+* The Stop hotkey (`Ctrl+Alt+Shift+S` by default) is registered **with Windows
+  itself** (`RegisterHotKey`), so it stops everything even when another
+  application has the keyboard. If Windows refuses the combination - another
+  program already owns it - LUMI says so in the button's tooltip and keeps the
+  in-application shortcut as the fallback. Change it in Settings →
+  Permissions → Emergency stop.
 * Stopping is remembered per turn: a new message starts a fresh, unstoppable
   state.
 

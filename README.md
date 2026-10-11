@@ -24,7 +24,7 @@ the filesystem, and the tests really run (see [Testing](#testing)).
 ## Status
 
 Phase 2 of 7 is complete: the core, the tools, the security layer and the
-desktop window all work, with **354 automated tests passing** (1 skipped:
+desktop window all work, with **358 automated tests passing** (1 skipped:
 a Windows-only notification test).  See [docs/features.md](docs/features.md)
 for what is implemented and what is not.
 
@@ -164,7 +164,7 @@ See [docs/security.md](docs/security.md) for the full model.
 .venv\Scripts\python -m pytest
 ```
 
-The suite is offline and needs no model: **354 passed, 1 skipped** on the
+The suite is offline and needs no model: **358 passed, 1 skipped** on the
 development machine. The skip is a Windows-only notification test.
 
 ```bat

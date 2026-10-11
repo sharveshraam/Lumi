@@ -649,3 +649,60 @@ def test_clearing_the_activity_log_requires_confirmation(ui_services, qt_app, ex
     )
     page.clear_activity()
     assert ui_services.audit.count() == 0
+
+
+# ---------------------------------------------------------------------------
+# the emergency-stop hotkey
+# ---------------------------------------------------------------------------
+def test_hotkey_parsing_understands_the_settings_format() -> None:
+    from lumi.ui.hotkeys import HotkeyError, parse_hotkey
+
+    modifiers, key = parse_hotkey("Ctrl+Alt+Shift+S")
+    assert modifiers & 0x0002 and modifiers & 0x0001 and modifiers & 0x0004
+    assert key == ord("S")
+
+    # spacing and case do not matter
+    assert parse_hotkey("ctrl + shift + f9")[1] == 0x78
+    assert parse_hotkey("Win+F12")[0] & 0x0008
+
+
+def test_a_hotkey_typo_is_reported_not_ignored() -> None:
+    from lumi.ui.hotkeys import HotkeyError, parse_hotkey
+
+    for bad in ("", "S", "Ctrl", "Ctrl+Banana", "Ctrl+Alt+S+K"):
+        with pytest.raises(HotkeyError):
+            parse_hotkey(bad)
+
+
+def test_a_global_hotkey_that_cannot_be_installed_falls_back(ui_services, qt_app) -> None:
+    """On this machine there is no Windows to register with: it must say so."""
+    from lumi.ui.hotkeys import GlobalHotkey, is_supported
+    from lumi.ui.main_window import MainWindow
+
+    if is_supported():
+        pytest.skip("this test is about the non-Windows fallback")
+
+    pressed: list[int] = []
+    hotkey = GlobalHotkey("Ctrl+Alt+Shift+S", lambda: pressed.append(1))
+    assert hotkey.register() is False
+    assert hotkey.reason, "the user is told why"
+    assert pressed == []
+
+    window = MainWindow(ui_services)
+    assert window.stop_hotkey is None, "no global hotkey on this platform"
+    # ...but the in-app shortcut still stops everything.
+    window.emergency_stop()
+    assert ui_services.app.stopped is True
+    window._quitting = True
+    window.close()
+
+
+def test_the_stop_tooltip_explains_what_is_available(ui_services, qt_app) -> None:
+    from lumi.ui.main_window import MainWindow
+
+    window = MainWindow(ui_services)
+    tooltip = window.stop_button.toolTip()
+    assert "Stops any running action" in tooltip
+    assert "Ctrl+Alt+Shift+S" in tooltip
+    window._quitting = True
+    window.close()
