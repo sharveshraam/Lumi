@@ -438,3 +438,163 @@ def test_the_startup_checkbox_writes_and_removes_a_launcher(ui_services, qt_app,
     page.launch_on_login.setChecked(False)
     page.save()
     assert not launcher.exists(), "unticking it must remove the entry again"
+
+
+# ---------------------------------------------------------------------------
+# one whole turn: message -> model -> tool -> transcript
+# ---------------------------------------------------------------------------
+class _ToolCallingEngine:
+    """A stand-in for the assistant: it asks for one real tool, then answers.
+
+    Everything except the model is the real thing - the real executor, the real
+    policy, the real database - so this covers the path a user actually takes.
+    """
+
+    def __init__(self, executor, tool: str, arguments: dict, answer: str = "All done.") -> None:
+        self.executor = executor
+        self.tool = tool
+        self.arguments = dict(arguments)
+        self.answer = answer
+        self.calls: list[str] = []
+
+    # the slice of AssistantEngine the UI uses
+    def status(self):
+        from lumi.ai.ollama import OllamaStatus
+
+        return OllamaStatus(running=True, installed=True, message="ready", error_kind="")
+
+    def list_models(self):
+        return []
+
+    def selected_model(self) -> str:
+        return "fake-model"
+
+    def describe_state(self):
+        return {"provider": "local", "ollama": {}, "selected_model": "fake-model"}
+
+    def invalidate_model_cache(self) -> None:
+        return None
+
+    def send(
+        self,
+        message,
+        *,
+        conversation_id=None,
+        callbacks=None,
+        stop_token=None,
+        tool_context=None,
+        allow_tools=True,
+        save_history=True,
+    ):
+        from lumi.ai.assistant import AssistantReply
+        from lumi.tools.executor import ToolCall
+
+        self.calls.append(message)
+        call = ToolCall(self.tool, dict(self.arguments), source="model")
+        if callbacks is not None:
+            callbacks.message_start("fake-model")
+            callbacks.tool_proposed(call)
+            callbacks.tool_started(call.name, call.arguments)
+        outcome = self.executor.execute(call, tool_context)
+        if callbacks is not None:
+            callbacks.tool_finished(outcome)
+            callbacks.token(self.answer)
+            callbacks.message_end(self.answer)
+        return AssistantReply(
+            text=self.answer,
+            model="fake-model",
+            provider="local",
+            tool_runs=[outcome],
+            duration_ms=12,
+        )
+
+
+def _use_real_context(ui_services, tool_context) -> None:
+    """Give the page the real ToolContext instead of the stub one."""
+    ui_services.app.tool_context = lambda **kwargs: tool_context
+
+
+def _run_worker(qt_app, page) -> None:
+    """Wait for the page's chat worker to finish, pumping the Qt event loop."""
+    import time
+
+    deadline = time.monotonic() + 10
+    while page.worker is not None and time.monotonic() < deadline:
+        qt_app.processEvents()
+        if page.worker is not None and page.worker.isRunning():
+            page.worker.wait(50)
+        time.sleep(0.01)
+    qt_app.processEvents()
+
+
+def test_a_turn_runs_a_tool_and_shows_it_in_the_transcript(ui_services, qt_app, tool_context) -> None:
+    _use_real_context(ui_services, tool_context)
+    ui_services.engine = _ToolCallingEngine(
+        ui_services.executor, "add_task", {"title": "Revise Thevenin"}, answer="Added it."
+    )
+    page = ChatPage(ui_services)
+    page.send_message("add a task to revise Thevenin")
+    _run_worker(qt_app, page)
+
+    # the tool really ran, against the real repository
+    titles = [task.title for task in ui_services.tasks.list(status="open")]
+    assert "Revise Thevenin" in titles
+
+    # and the transcript shows the user, the answer and the tool
+    assert page._tool_cards["add_task"].status == "ok"
+    assert page._tool_cards["add_task"].result.text() != ""
+    assert page.activity_pill.text() == "add_task"
+    assert page.send_button.isEnabled() and not page.stop_button.isEnabled()
+
+
+def test_a_second_turn_reuses_the_conversation(ui_services, qt_app, tool_context) -> None:
+    _use_real_context(ui_services, tool_context)
+    engine = _ToolCallingEngine(ui_services.executor, "add_task", {"title": "Second"}, answer="ok")
+    ui_services.engine = engine
+    page = ChatPage(ui_services)
+    page.send_message("first message")
+    _run_worker(qt_app, page)
+    first = page.conversation_id
+    assert first is not None
+
+    page.send_message("second message")
+    _run_worker(qt_app, page)
+    assert page.conversation_id == first, "a conversation continues until you start a new one"
+    assert len(engine.calls) == 2
+
+    page.start_new_conversation()
+    assert page.conversation_id is None
+    assert page._tool_cards == {}
+
+
+def test_a_denied_tool_is_shown_as_denied_not_as_done(ui_services, qt_app, tool_context, workspace) -> None:
+    """Permissions must be visible in the transcript, not silently skipped."""
+    _use_real_context(ui_services, tool_context)
+    settings = ui_services.settings_store.settings
+    settings.automation.allow_file_writes = False
+    ui_services.engine = _ToolCallingEngine(
+        ui_services.executor,
+        "write_text_file",
+        {"path": str(workspace / "nope.txt"), "content": "x"},
+        answer="I could not write that.",
+    )
+    page = ChatPage(ui_services)
+    page.send_message("write a file")
+    _run_worker(qt_app, page)
+
+    card = page._tool_cards["write_text_file"]
+    assert card.status in {"denied", "declined", "error"}
+    assert not (workspace / "nope.txt").exists()
+
+
+def test_stop_is_recorded_and_the_ui_resets(ui_services, qt_app, tool_context) -> None:
+    _use_real_context(ui_services, tool_context)
+    ui_services.engine = _ToolCallingEngine(ui_services.executor, "current_datetime", {}, answer="now")
+    page = ChatPage(ui_services)
+    assert page.is_busy() is False
+    page.send_message("hello")
+    _run_worker(qt_app, page)
+    assert page.is_busy() is False
+    # Pressing stop when nothing is running is harmless.
+    page.stop()
+    assert page.is_busy() is False

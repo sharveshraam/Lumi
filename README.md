@@ -21,6 +21,15 @@ the filesystem, and the tests really run (see [Testing](#testing)).
 └────────────┴─────────────────────────────────────────────────┘
 ```
 
+## Status
+
+Phase 2 of 7 is complete: the core, the tools, the security layer and the
+desktop window all work, with **335 automated tests passing** (1 skipped:
+a Windows-only notification test).  See [docs/features.md](docs/features.md)
+for what is implemented and what is not.
+
+Commit: `1e4faa4` on `arena/9996b087-lumi`.
+
 ## Why it is safe to leave running
 
 * **Local by default.** Answers come from Ollama on `127.0.0.1`. The client
@@ -155,7 +164,7 @@ See [docs/security.md](docs/security.md) for the full model.
 .venv\Scripts\python -m pytest
 ```
 
-The suite is offline and needs no model: **331 passed, 1 skipped** on the
+The suite is offline and needs no model: **335 passed, 1 skipped** on the
 development machine. The skip is a Windows-only notification test.
 
 ```bat

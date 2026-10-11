@@ -1,6 +1,6 @@
 # Manual acceptance checklist
 
-The automated suite covers the logic (`pytest -q` → 331 passed, 1 skipped), but
+The automated suite covers the logic (`pytest -q` → 335 passed, 1 skipped), but
 some things can only be judged by a person on a real desktop. Work through this
 list in order; each item says how to tell it worked.
 
@@ -44,7 +44,7 @@ you care about.
 | 25 | **Error resilience** | Rename `lumi.db` while LUMI is closed and start it: LUMI recreates an empty database and tells you. Corrupt `settings.json` (write `{{{` in it): LUMI starts with defaults and leaves `settings.corrupt-*.json` behind. |
 | 26 | **Resource discipline** | With a model answering, watch Task Manager. Nothing is loaded before the first question; asking `unload the model` releases the memory within a few seconds. |
 | 27 | **Audit trail** | Settings → Activity lists the tool calls you made above, with times and outcomes, and no secrets in the arguments. |
-| 28 | **Tests** | `pytest -q` ends with `331 passed, 1 skipped`. |
+| 28 | **Tests** | `pytest -q` ends with `335 passed, 1 skipped`. |
 
 ## Definition of done (the twelve)
 
