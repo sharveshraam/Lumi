@@ -307,7 +307,10 @@ class AssistantEngine:
         allow_tools = allow_tools and self.tools_enabled()
         key = int(conversation_id or 0)
 
-        if save_history and conversation_id:
+        # "Save conversations" is a real switch: with it off, neither side of the
+        # exchange is written.  The assistant's reply already honoured it, so the
+        # user's half used to be stored on its own.
+        if save_history and conversation_id and self.settings.privacy.save_conversations:
             try:
                 self.conversations.add_message(conversation_id, "user", message)
             except Exception:  # pragma: no cover - history is best effort

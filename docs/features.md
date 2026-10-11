@@ -168,9 +168,9 @@ presses Stop mid-stream; and a network pull that is cancelled.
 
 ## 13. Testing and documentation
 
-* 338 automated tests (1 skipped: a Windows-only notification test), run
+* 351 automated tests (1 skipped: a Windows-only notification test), run
   offline with no model, no network and no display.
-* `pytest -q` → `338 passed, 1 skipped`.
+* `pytest -q` → `351 passed, 1 skipped`.
 * Manual acceptance checklist: [acceptance.md](acceptance.md).
 * Build instructions: [packaging.md](packaging.md).
 

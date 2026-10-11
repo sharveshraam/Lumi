@@ -258,6 +258,25 @@ def validate_base_url(base_url: str, *, allow_non_loopback: bool = False) -> str
     return candidate
 
 
+def _classify_error(status_code: int, body: str) -> str:
+    """Map an HTTP failure from Ollama onto one of :class:`OllamaError`.KINDS.
+
+    Ollama reports real problems in the body ("model requires more system
+    memory", "model not found"), and those deserve a specific, friendly
+    explanation rather than a status code.
+    """
+    text = (body or "").lower()
+    if status_code == 404 or "not found" in text or "no such model" in text:
+        return "model_missing"
+    if "memory" in text or "out of memory" in text or "system memory" in text:
+        return "memory"
+    if "connection" in text or "connection refused" in text:
+        return "connection"
+    if "timed out" in text or "timeout" in text:
+        return "timeout"
+    return "http"
+
+
 class OllamaClient:
     """Minimal client for the endpoints LUMI uses."""
 
@@ -542,12 +561,16 @@ class OllamaClient:
             with client.stream("POST", "/api/chat", json=payload, timeout=timeout) as response:
                 if response.status_code >= 400:
                     body = self._safe_body(response)
-                    kind = "model_missing" if response.status_code == 404 else "http"
+                    kind = _classify_error(response.status_code, body)
+                    # For known causes the friendly hint is better than the raw
+                    # JSON body; anything else keeps the body, because it is the
+                    # only clue the user has.
+                    hint = "" if kind in ("model_missing", "memory") else body
                     raise OllamaError(
                         f"Ollama refused the request ({response.status_code}).",
                         kind=kind,
                         status_code=response.status_code,
-                        hint=body,
+                        hint=hint,
                     )
                 for line in response.iter_lines():
                     if stop_token is not None and stop_token.cancelled:
@@ -591,7 +614,21 @@ class OllamaClient:
         )
 
     @staticmethod
+    def _classify_error(status_code: int, body: str) -> str:
+        """Turn a server error into one of LUMI's own error kinds."""
+        return _classify_error(status_code, body)
+
+    @staticmethod
     def _safe_body(response: Any) -> str:
+        """The response body, or "" - never an exception.
+
+        Inside ``client.stream(...)`` the body has not been read yet, so it is
+        read here first; otherwise every error would look like an empty one.
+        """
+        try:
+            response.read()
+        except Exception:  # noqa: BLE001 - already read, or not readable
+            pass
         try:
             return str(response.text)[:300]
         except Exception:  # pragma: no cover - defensive
