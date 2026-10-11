@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QPushButton,
     QScrollArea,
     QSpinBox,
@@ -79,6 +81,7 @@ class SettingsPage(QWidget):
         self.pages.addTab(self._build_speech_tab(), "Voice")
         self.pages.addTab(self._build_privacy_tab(), "Privacy & data")
         self.pages.addTab(self._build_appearance_tab(), "Appearance")
+        self.pages.addTab(self._build_activity_tab(), "Activity")
         self.pages.addTab(self._build_about_tab(), "About")
         layout = QVBoxLayout(inner)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -347,6 +350,116 @@ class SettingsPage(QWidget):
 
         layout.addStretch(1)
         return page
+
+    # ------------------------------------------------------------------ activity
+    def _build_activity_tab(self) -> QWidget:
+        """Everything LUMI has done, read from the audit log.
+
+        The log is the record the permission system writes: tool, time, outcome
+        and whether the user confirmed it.  Arguments are already redacted, so
+        this view is safe to show and safe to screenshot.
+        """
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setSpacing(12)
+
+        intro = QLabel(
+            "Every tool LUMI runs is recorded here: what it was, when, whether it "
+            "succeeded and whether you allowed it.  Credentials are removed before "
+            "they are written, so this list is safe to share."
+        )
+        intro.setWordWrap(True)
+        intro.setObjectName("Muted")
+        layout.addWidget(intro)
+
+        controls = Row(spacing=8)
+        self.activity_limit = QSpinBox()
+        self.activity_limit.setRange(10, 500)
+        self.activity_limit.setValue(50)
+        self.activity_limit.setSuffix(" entries")
+        self.activity_limit.valueChanged.connect(lambda _value: self.refresh_activity())
+        controls.add(QLabel("Show the last"))
+        controls.add(self.activity_limit)
+        refresh = QPushButton("Refresh")
+        refresh.clicked.connect(self.refresh_activity)
+        controls.add(refresh)
+        controls.add_stretch()
+        clear = QPushButton("Clear the log")
+        clear.clicked.connect(self.clear_activity)
+        controls.add(clear)
+        layout.addWidget(controls)
+
+        self.activity_list = QListWidget()
+        self.activity_list.setObjectName("Mono")
+        layout.addWidget(self.activity_list, 1)
+
+        self.activity_summary = QLabel("")
+        self.activity_summary.setObjectName("Faint")
+        self.activity_summary.setWordWrap(True)
+        layout.addWidget(self.activity_summary)
+
+        self.refresh_activity()
+        return page
+
+    def refresh_activity(self) -> None:
+        audit = getattr(self.services, "audit", None)
+        if audit is None:
+            self.activity_summary.setText("No activity log is available.")
+            return
+        try:
+            entries = audit.recent_from_db(limit=int(self.activity_limit.value()))
+            summary = audit.summary(limit=200)
+        except Exception as exc:  # noqa: BLE001 - the viewer must never crash settings
+            log.info("could not read the activity log: %s", exc)
+            self.activity_summary.setText(f"Could not read the activity log: {exc}")
+            return
+
+        self.activity_list.clear()
+        for entry in entries:
+            when = entry.ts.strftime("%d %b %H:%M:%S") if entry.ts else "?"
+            permission = f" · {entry.permission}" if entry.permission else ""
+            line = (
+                f"{when}  {entry.status:>9}  {entry.tool:24}"
+                f"  {entry.duration_ms:>6} ms{permission}"
+            )
+            item = QListWidgetItem(line)
+            item.setToolTip(entry.human_line())
+            if entry.status not in ("ok",):
+                item.setForeground(Qt.GlobalColor.yellow)
+            self.activity_list.addItem(item)
+
+        if not entries:
+            self.activity_list.addItem("Nothing yet — this fills up as you use LUMI.")
+        total = sum(summary.values()) if summary else 0
+        self.activity_summary.setText(
+            f"{len(entries)} of {total} recorded calls. "
+            f"Outcomes: " + ", ".join(f"{name} {count}" for name, count in sorted(summary.items()))
+        )
+
+    def clear_activity(self) -> None:
+        """Deleting the log is a real deletion, so it asks first."""
+        from PySide6.QtWidgets import QMessageBox
+
+        audit = getattr(self.services, "audit", None)
+        if audit is None:
+            return
+        answer = QMessageBox.question(
+            self,
+            "Clear the activity log?",
+            "This deletes the record of what LUMI has done on this computer. "
+            "The log itself stays empty until you use LUMI again.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            removed = audit.clear()
+        except Exception as exc:  # noqa: BLE001
+            self.status_label.setText(f"Could not clear the log: {exc}")
+            return
+        self.status_label.setText(f"Cleared {removed} entries from the activity log.")
+        self.refresh_activity()
 
     # ------------------------------------------------------------ appearance
     def _build_appearance_tab(self) -> QWidget:

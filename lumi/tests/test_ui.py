@@ -598,3 +598,54 @@ def test_stop_is_recorded_and_the_ui_resets(ui_services, qt_app, tool_context) -
     # Pressing stop when nothing is running is harmless.
     page.stop()
     assert page.is_busy() is False
+
+
+# ---------------------------------------------------------------------------
+# the activity log in Settings
+# ---------------------------------------------------------------------------
+def test_settings_activity_tab_lists_what_lumi_did(ui_services, qt_app, executor, tool_context) -> None:
+    from lumi.ui.pages.settings import SettingsPage
+    from lumi.tools.executor import ToolCall
+
+    # run a tool through the real executor so the audit log has something in it
+    executor.execute(ToolCall("current_datetime", {}, source="user"), tool_context)
+
+    page = SettingsPage(ui_services)
+    page.refresh_activity()
+    rows = [page.activity_list.item(i).text() for i in range(page.activity_list.count())]
+    assert any("current_datetime" in row for row in rows), rows
+    assert any("ok" in row for row in rows)
+    assert "recorded calls" in page.activity_summary.text()
+
+
+def test_activity_tab_says_so_when_the_log_is_empty(ui_services, qt_app) -> None:
+    from lumi.ui.pages.settings import SettingsPage
+
+    page = SettingsPage(ui_services)
+    rows = [page.activity_list.item(i).text() for i in range(page.activity_list.count())]
+    assert rows, "the list must say something rather than showing nothing"
+    assert "Nothing yet" in rows[0]
+
+
+def test_clearing_the_activity_log_requires_confirmation(ui_services, qt_app, executor, tool_context, monkeypatch) -> None:
+    from PySide6.QtWidgets import QMessageBox
+
+    from lumi.tools.executor import ToolCall
+    from lumi.ui.pages.settings import SettingsPage
+
+    executor.execute(ToolCall("current_datetime", {}, source="user"), tool_context)
+    page = SettingsPage(ui_services)
+    assert ui_services.audit.count() > 0
+
+    # answering "No" changes nothing
+    monkeypatch.setattr(
+        QMessageBox, "question", staticmethod(lambda *a, **k: QMessageBox.StandardButton.No)
+    )
+    page.clear_activity()
+    assert ui_services.audit.count() > 0
+
+    monkeypatch.setattr(
+        QMessageBox, "question", staticmethod(lambda *a, **k: QMessageBox.StandardButton.Yes)
+    )
+    page.clear_activity()
+    assert ui_services.audit.count() == 0
