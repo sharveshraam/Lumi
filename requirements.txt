@@ -1,0 +1,28 @@
+# LUMI runtime requirements.
+#
+# The core application (tasks, notes, reminders, memory, files, config) runs on
+# the standard library alone; these are what make the window and the optional
+# features work.  Install with:  pip install -r requirements.txt
+
+# --- required for the desktop window -----------------------------------------
+PySide6>=6.6,<7            # the Qt user interface
+httpx>=0.27                # talks to Ollama over loopback HTTP
+jsonschema>=4.20           # validates every tool call before it runs
+python-dateutil>=2.8       # natural-language date parsing
+psutil>=5.9                # RAM/CPU reporting for the hardware check
+Pillow>=10.0               # screenshots and image handling
+
+# --- Windows desktop control (installed on Windows only) ---------------------
+pyautogui>=0.9.54 ; sys_platform == "win32"
+pywinauto>=0.6.8 ; sys_platform == "win32"
+pyperclip>=1.8 ; sys_platform == "win32"
+
+# --- optional: voice ---------------------------------------------------------
+# faster-whisper>=1.0      # local speech-to-text
+# sounddevice>=0.4         # microphone capture
+# numpy>=1.24              # audio buffers
+# pyttsx3>=2.90            # system voice output (Piper is preferred)
+
+# --- development -------------------------------------------------------------
+# pytest>=8.0
+# pyinstaller>=6.0         # for building the .exe (see docs/packaging.md)
