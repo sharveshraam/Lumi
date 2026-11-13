@@ -1,0 +1,109 @@
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.devtools.ksp")
+}
+
+// Release signing is driven entirely by environment variables (GitHub Secrets in CI).
+// Nothing secret is ever committed. See GITHUB_ACTIONS.md.
+val keystorePath: String? = System.getenv("LUMI_KEYSTORE_FILE")
+val hasReleaseSigning = !keystorePath.isNullOrBlank() && file(keystorePath!!).exists()
+
+android {
+    namespace = "com.lumi.assistant"
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = "com.lumi.assistant"
+        minSdk = 26
+        targetSdk = 34
+        versionCode = (System.getenv("LUMI_VERSION_CODE") ?: "1").toInt()
+        versionName = System.getenv("LUMI_VERSION_NAME") ?: "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(keystorePath!!)
+                storePassword = System.getenv("LUMI_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("LUMI_KEY_ALIAS")
+                keyPassword = System.getenv("LUMI_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
+        release {
+            isMinifyEnabled = false
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+        freeCompilerArgs = freeCompilerArgs + listOf(
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.compose.foundation.layout.ExperimentalLayoutApi",
+        )
+    }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+    lint {
+        abortOnError = true
+        checkReleaseBuilds = false
+        textReport = true
+        textOutput = file("build/reports/lint-results.txt")
+        htmlReport = true
+        // Dependency versions are pinned on purpose for reproducible CI builds.
+        disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion", "OldTargetApi")
+    }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+    packaging {
+        resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+    }
+}
+
+ksp {
+    arg("room.incremental", "true")
+}
+
+dependencies {
+    implementation(project(":core"))
+
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.activity:activity-compose:1.9.2")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.5")
+
+    implementation(platform("androidx.compose:compose-bom:2024.09.00"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-core")
+
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
+
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+}
