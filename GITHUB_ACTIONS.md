@@ -1,27 +1,10 @@
 # GitHub Actions
 
-## One-time setup: add the workflow file
+## Setup
 
-The workflow is stored at `ci/android-build.yml` because the tool that wrote this repository is not permitted to create files under `.github/workflows/`. Until the file is copied there, **no build runs**.
+The workflow is installed at `.github/workflows/android-build.yml`. `ci/android-build.yml` is an identical copy kept for reference; if you change one, change the other.
 
-Using the GitHub website:
-
-1. Open `ci/android-build.yml`, click **Raw**, and copy the contents.
-2. In the repository, choose **Add file > Create new file**.
-3. Name it `.github/workflows/android-build.yml` and paste the contents.
-4. Commit to the branch you want built.
-
-Or from a clone with your own credentials:
-
-```
-mkdir -p .github/workflows
-cp ci/android-build.yml .github/workflows/android-build.yml
-git add .github/workflows/android-build.yml
-git commit -m "Add Android build workflow"
-git push
-```
-
-Also check **Settings > Actions > General > Workflow permissions**: "Read and write permissions" is needed for the release job to publish a GitHub Release.
+For the release job to publish a GitHub Release, set **Settings > Actions > General > Workflow permissions** to "Read and write permissions".
 
 ## What the workflow does
 
