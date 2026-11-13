@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Lumi</string>
+    <string name="channel_reminders">Reminders</string>
+    <string name="channel_reminders_desc">Task reminders you asked Lumi to deliver.</string>
+    <string name="channel_briefing">Daily briefing</string>
+    <string name="channel_briefing_desc">The optional once-a-day summary.</string>
+    <string name="reminder_title">Reminder</string>
+    <string name="reminder_missed">Missed reminder</string>
+    <string name="reminder_again">Still to do</string>
+    <string name="reminder_at_place">At %1$s</string>
+    <string name="action_done">Done</string>
+    <string name="action_snooze">Snooze 10 min</string>
+    <string name="action_postpone">In 1 hour</string>
+    <string name="briefing_title">Your briefing</string>
+    <string name="snooze_failed">Lumi could not reschedule this reminder. Open Lumi to set a new time.</string>
+    <string name="snoozed_until">Snoozed until %1$s</string>
+
+    <string name="assist_label">Lumi assistant</string>
+    <string name="assist_listening">Listening</string>
+    <string name="assist_starting">Starting microphone</string>
+    <string name="assist_thinking">Working on it</string>
+    <string name="assist_idle">Tap Speak or type</string>
+    <string name="assist_mic">Speak</string>
+    <string name="assist_stop">Done</string>
+    <string name="assist_mic_description">Start or stop listening</string>
+    <string name="assist_type_hint">Type instead</string>
+    <string name="assist_no_mic">Lumi needs the microphone permission to hear you. You can still type.</string>
+    <string name="assist_no_recognizer">This phone has no speech recognition service. You can still type.</string>
+    <string name="assist_error">Something went wrong on my side. Please try again.</string>
+    <string name="assist_open_screen">Open Lumi: %1$s</string>
+    <string name="assist_unlock">Unlock your phone to continue</string>
+    <string name="assist_unlock_cancelled">Still locked, so I stopped there.</string>
+    <string name="assist_briefing_locked">Unlock your phone and I will read your briefing.</string>
+    <string name="assist_welcome">Hi, I\'m Lumi. I can set reminders, manage tasks, make calls, read notifications and open apps. If you want, say \"set me up\" and I\'ll ask a few questions to get to know you. What can I do for you?</string>
+    <string name="accessibility_description">Optional. When you ask, Lumi reads the text of the app on screen to explain it, find a button, scroll, tap or type for you. Lumi does not watch the screen in the background, never reads password fields, and only looks when you ask.</string>
+    <string name="accessibility_label">Lumi screen awareness</string>
+    <string name="notification_listener_label">Lumi notification reader</string>
+</resources>
