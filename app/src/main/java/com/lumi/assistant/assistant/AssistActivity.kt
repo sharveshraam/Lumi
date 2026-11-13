@@ -381,7 +381,7 @@ class AssistActivity : Activity(), SpeechToText.Listener {
         setStatus(getString(R.string.assist_thinking))
         scope.launch {
             val reply = try {
-                graph.orchestrator.handle(text, TurnEnv(deviceLocked = deviceLocked(), voice = !typed))
+                graph.turn(text, TurnEnv(deviceLocked = deviceLocked(), voice = !typed))
             } catch (e: Exception) {
                 Reply(getString(R.string.assist_error), success = false)
             }

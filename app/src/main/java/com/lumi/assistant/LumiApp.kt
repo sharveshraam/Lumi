@@ -23,6 +23,7 @@ import com.lumi.assistant.tools.ToolSupport
 import com.lumi.assistant.voice.AndroidSpeechSynth
 import com.lumi.core.agent.AiTextReviser
 import com.lumi.core.agent.Orchestrator
+import com.lumi.core.agent.Reply
 import com.lumi.core.ai.AiClient
 import com.lumi.core.ai.AiConfig
 import com.lumi.core.ai.HttpAiClient
@@ -38,6 +39,7 @@ import com.lumi.core.tools.MemoryTools
 import com.lumi.core.tools.SessionState
 import com.lumi.core.tools.TaskTools
 import com.lumi.core.tools.ToolRegistry
+import com.lumi.core.tools.TurnEnv
 
 /**
  * Everything Lumi needs, built once per process. Construction is cheap: nothing here starts
@@ -107,6 +109,22 @@ class Graph(val context: Context) {
         log = log,
         time = time,
     )
+
+    /**
+     * Runs one conversation turn. If the turn scheduled a reminder while notifications are
+     * blocked, the reply says so: an alarm that cannot show anything is not a working reminder.
+     */
+    suspend fun turn(text: String, env: TurnEnv): Reply {
+        val before = tasks.scheduledReminders().size
+        val reply = orchestrator.handle(text, env)
+        if (reply.success && !notifier.canNotify() && tasks.scheduledReminders().size > before) {
+            return reply.copy(
+                text = reply.text + " One problem: notifications are blocked for Lumi, so I can't show this reminder until you allow them in Permissions.",
+                suggestScreen = "permissions",
+            )
+        }
+        return reply
+    }
 
     /** Re-registers every alarm and geofence and surfaces reminders that were missed meanwhile. */
     suspend fun restoreSchedules(reason: String) {

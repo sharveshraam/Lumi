@@ -86,7 +86,7 @@ fun TasksScreen(graph: Graph) {
             command = ""
             scope.launch {
                 reply = try {
-                    graph.orchestrator.handle(text, TurnEnv(deviceLocked = false, voice = false)).text
+                    graph.turn(text, TurnEnv(deviceLocked = false, voice = false)).text
                 } catch (e: Exception) {
                     "That didn't work: ${e.message ?: "unknown error"}."
                 }
