@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Reports the metadata of a built APK and fails if it is not what an installable Lumi build
-# must be. Usage:
+# must be. Gradle runs it after assembleDebug / assembleRelease when CI=true (see app/build.gradle.kts).
+# Usage:
 #   verify-apk.sh verify <apk-directory> <expected-package> <expected-minSdk> <expected-targetSdk> [expected-cert-sha256]
 #   verify-apk.sh publish <check-run-name>      (posts the report as a check run on the commit)
 # The report is written to build-logs/40-apk-metadata.md and the job summary.
@@ -169,4 +170,10 @@ fi
 
 cat "$report"
 [[ -n "${GITHUB_STEP_SUMMARY:-}" ]] && cat "$report" >> "$GITHUB_STEP_SUMMARY"
+if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+  # Annotations are visible on the run page and through the API without downloading logs.
+  echo "::notice title=APK metadata::$(basename "$apk") package=$pkg versionCode=$vcode versionName=$vname minSdk=$min targetSdk=$target abis=${libs:-none} split=${split:-none} testOnly=$test_only debuggable=$debuggable aligned=$aligned schemes=$schemes signatureOk=$([[ $sig_rc -eq 0 ]] && echo yes || echo no) cert=$cert certPinned=${want_cert:-no} apkSha256=$(sha256sum "$apk" | cut -d' ' -f1) size=$(stat -c %s "$apk") result=$([[ $fail -eq 0 ]] && echo PASS || echo FAIL)"
+  echo "::notice title=APK requirements::requiredFeatures=${required_features:-none} usesLibrary=${libraries:-none} sharedUserId=${shared_uid:-none} maxSdk=${maxsdk:-none} dexFiles=$dex certDN=$cert_dn"
+  for p in "${problems[@]}"; do echo "::error title=APK check failed::$p"; done
+fi
 exit $fail

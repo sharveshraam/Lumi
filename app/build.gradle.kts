@@ -99,3 +99,25 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 }
+
+// After an APK is assembled, report its package, SDK levels, ABIs and signing certificate, and
+// fail the build if they are not what an installable Lumi build must have. In CI this runs
+// automatically; locally run `./gradlew :app:verifyDebugApk` (needs bash and ANDROID_HOME).
+val pinnedDebugCert: String = rootProject.file("ci/debug-cert.sha256").let { if (it.exists()) it.readText().trim() else "" }
+listOf(
+    Triple("Debug", "com.lumi.assistant.debug", pinnedDebugCert),
+    Triple("Release", "com.lumi.assistant", ""),
+).forEach { (variant, expectedPackage, expectedCert) ->
+    val verify = tasks.register<Exec>("verify${variant}Apk") {
+        group = "verification"
+        description = "Reports and validates the metadata and signature of the $variant APK."
+        workingDir = rootDir
+        commandLine(
+            "bash", ".github/scripts/verify-apk.sh", "verify",
+            "app/build/outputs/apk/${variant.lowercase()}", expectedPackage, "26", "34", expectedCert,
+        )
+    }
+    if (System.getenv("CI") == "true") {
+        tasks.matching { it.name == "assemble$variant" }.configureEach { finalizedBy(verify) }
+    }
+}
