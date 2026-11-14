@@ -1,0 +1,17 @@
+*.iml
+.gradle/
+.idea/
+local.properties
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+.kotlin/
+*.apk
+*.aab
+*.jks
+*.keystore
+# The shared debug key is public on purpose: it only signs debug builds (see GITHUB_ACTIONS.md).
+!app/debug.keystore
+keystore.properties
+.DS_Store
