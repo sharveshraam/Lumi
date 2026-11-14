@@ -23,6 +23,17 @@ android {
     }
 
     signingConfigs {
+        // Debug builds are signed with one key that lives in the repository. Without this,
+        // every CI runner generates its own debug key, and a build from one run cannot be
+        // installed over a build from another (INSTALL_FAILED_UPDATE_INCOMPATIBLE).
+        // This key protects nothing: release builds use the secret key below.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storeType = "pkcs12"
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         if (hasReleaseSigning) {
             create("release") {
                 storeFile = file(keystorePath!!)
