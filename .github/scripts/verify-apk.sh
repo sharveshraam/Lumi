@@ -102,10 +102,11 @@ split_required=no; attr_true isSplitRequired && split_required=yes
 shared_uid="$(grep -m1 'android:sharedUserId' <<<"$manifest" | sed 's/.*="\([^"]*\)".*/\1/')"
 
 sig="$("$apksigner" verify --verbose --print-certs --min-sdk-version "$want_min" "$apk" 2>&1)"; sig_rc=$?
-cert="$(sed -n 's/^Signer .*certificate SHA-256 digest: *//p' <<<"$sig" | sort -u | head -n 1)"
-cert_dn="$(sed -n 's/^Signer .*certificate DN: *//p' <<<"$sig" | head -n 1)"
+digests="$(grep -oE 'certificate SHA-256 digest: *[0-9a-fA-F]{64}' <<<"$sig" | grep -oE '[0-9a-fA-F]{64}$' | tr 'A-F' 'a-f' | sort -u)"
+cert="$(head -n 1 <<<"$digests")"
+cert_dn="$(sed -n 's/^.*certificate DN: *//p' <<<"$sig" | head -n 1)"
 schemes="$(grep -E '^Verified using v[0-9.]+ scheme' <<<"$sig" | sed 's/^Verified using //; s/ scheme ([^)]*)//' | tr '\n' ';')"
-signers="$(sed -n 's/^Signer .*certificate SHA-256 digest: *//p' <<<"$sig" | sort -u | grep -c .)"
+signers="$(grep -c . <<<"$digests")"
 
 # Install-time manifest rules that the build tools do not enforce but Android's installer does.
 manifest_facts="$(python3 "$(dirname "$0")/manifest-facts.py" <<<"$manifest" 2>&1)"
@@ -187,6 +188,7 @@ if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
   echo "::notice title=APK metadata::$(basename "$apk") package=$pkg versionCode=$vcode versionName=$vname minSdk=$min targetSdk=$target abis=${libs:-none} split=${split:-none} testOnly=$test_only debuggable=$debuggable aligned=$aligned schemes=$schemes signatureOk=$([[ $sig_rc -eq 0 ]] && echo yes || echo no) cert=$cert certPinned=${want_cert:-no} apkSha256=$(sha256sum "$apk" | cut -d' ' -f1) size=$(stat -c %s "$apk") result=$([[ $fail -eq 0 ]] && echo PASS || echo FAIL)"
   echo "::notice title=APK manifest::$(tr '\n' ' ' <<<"$manifest_facts")"
   echo "::notice title=APK requirements::requiredFeatures=${required_features:-none} usesLibrary=${libraries:-none} sharedUserId=${shared_uid:-none} maxSdk=${maxsdk:-none} dexFiles=$dex certDN=$cert_dn"
+  [[ -n "$cert" ]] || echo "::notice title=apksigner output::$(head -n 25 <<<"$sig" | tr '\n' '|')"
   for p in "${problems[@]}"; do echo "::error title=APK check failed::$p"; done
 fi
 exit $fail
