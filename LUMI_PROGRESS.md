@@ -44,3 +44,10 @@ Before CI was available, `:core` was also compiled and tested locally (130 tests
 ## Not planned for this version
 
 See KNOWN_LIMITATIONS.md ("Not built").
+
+## "App not installed" investigation (2026-11-13)
+
+- CI now verifies every APK after assembly (see "APK check" in `GITHUB_ACTIONS.md`). Verified on CI for the debug APK: package `com.lumi.assistant.debug`, versionCode 1, minSdk 26, targetSdk 34, ABIs arm64-v8a / armeabi-v7a / x86 / x86_64, single non-split APK, not testOnly, zip-aligned, v2 signature valid, 26 components all with `android:exported`.
+- Found and fixed: each CI run signed the debug APK with a different throwaway key (two runs of the same commit gave certificates `d27a6c27…` and `9627aca3…`). Debug builds now use the committed `app/debug.keystore`; certificate `33ea80c9…d622` is pinned in `ci/debug-cert.sha256`.
+- Not confirmed: the reason for the failure on the user's phone. The APK itself shows no install blocker, so the phone's `adb install -r` output is needed.
+- Still open: `.github/workflows/android_build.yml` on `main` is a second, failing workflow and should be deleted. Release build and on-device behaviour remain untested.
