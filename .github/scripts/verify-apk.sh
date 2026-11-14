@@ -102,10 +102,14 @@ split_required=no; attr_true isSplitRequired && split_required=yes
 shared_uid="$(grep -m1 'android:sharedUserId' <<<"$manifest" | sed 's/.*="\([^"]*\)".*/\1/')"
 
 sig="$("$apksigner" verify --verbose --print-certs --min-sdk-version "$want_min" "$apk" 2>&1)"; sig_rc=$?
-cert="$(sed -n 's/^Signer #1 certificate SHA-256 digest: *//p' <<<"$sig" | head -n 1)"
-cert_dn="$(sed -n 's/^Signer #1 certificate DN: *//p' <<<"$sig" | head -n 1)"
+cert="$(sed -n 's/^Signer .*certificate SHA-256 digest: *//p' <<<"$sig" | sort -u | head -n 1)"
+cert_dn="$(sed -n 's/^Signer .*certificate DN: *//p' <<<"$sig" | head -n 1)"
 schemes="$(grep -E '^Verified using v[0-9.]+ scheme' <<<"$sig" | sed 's/^Verified using //; s/ scheme ([^)]*)//' | tr '\n' ';')"
-signers="$(grep -c 'certificate SHA-256 digest' <<<"$sig")"
+signers="$(sed -n 's/^Signer .*certificate SHA-256 digest: *//p' <<<"$sig" | sort -u | grep -c .)"
+
+# Install-time manifest rules that the build tools do not enforce but Android's installer does.
+manifest_facts="$(python3 "$(dirname "$0")/manifest-facts.py" <<<"$manifest" 2>&1)"
+fact() { sed -n "s/^$1=//p" <<<"$manifest_facts" | head -n 1; }
 aligned=unknown
 if [[ -x "$zipalign" ]]; then "$zipalign" -c 4 "$apk" > /dev/null 2>&1 && aligned=yes || aligned=no; fi
 
@@ -136,6 +140,14 @@ out "| certificate DN | $cert_dn |"
 out "| certificate SHA-256 | \`$cert\` |"
 out "| expected certificate SHA-256 | \`${want_cert:-not pinned}\` |"
 
+out
+out "### Manifest facts"
+out '```'
+out "$manifest_facts"
+out '```'
+
+[[ "$(fact missingExported)" == "none" ]] || bad "components with an intent filter but no android:exported (rejected on Android 12+ with INSTALL_PARSE_FAILED_MANIFEST_MALFORMED): $(fact missingExported)"
+[[ "$(fact duplicateComponents)" == "none" ]] || bad "duplicate component declarations: $(fact duplicateComponents)"
 [[ "$pkg" == "$want_pkg" ]] || bad "package is '$pkg', expected '$want_pkg'"
 [[ "$min" == "$want_min" ]] || bad "minSdk is '$min', expected '$want_min'"
 [[ "$target" == "$want_target" ]] || bad "targetSdk is '$target', expected '$want_target'"
@@ -173,6 +185,7 @@ cat "$report"
 if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
   # Annotations are visible on the run page and through the API without downloading logs.
   echo "::notice title=APK metadata::$(basename "$apk") package=$pkg versionCode=$vcode versionName=$vname minSdk=$min targetSdk=$target abis=${libs:-none} split=${split:-none} testOnly=$test_only debuggable=$debuggable aligned=$aligned schemes=$schemes signatureOk=$([[ $sig_rc -eq 0 ]] && echo yes || echo no) cert=$cert certPinned=${want_cert:-no} apkSha256=$(sha256sum "$apk" | cut -d' ' -f1) size=$(stat -c %s "$apk") result=$([[ $fail -eq 0 ]] && echo PASS || echo FAIL)"
+  echo "::notice title=APK manifest::$(tr '\n' ' ' <<<"$manifest_facts")"
   echo "::notice title=APK requirements::requiredFeatures=${required_features:-none} usesLibrary=${libraries:-none} sharedUserId=${shared_uid:-none} maxSdk=${maxsdk:-none} dexFiles=$dex certDN=$cert_dn"
   for p in "${problems[@]}"; do echo "::error title=APK check failed::$p"; done
 fi
