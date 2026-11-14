@@ -60,13 +60,28 @@ jobs:
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace 2>&1 | tee build-logs/30-assemble-debug.log
 
+      - name: Verify debug APK metadata and signature
+        # ci/debug-cert.sha256 pins the certificate debug builds must be signed with (not pinned if absent).
+        run: bash .github/scripts/verify-apk.sh verify app/build/outputs/apk/debug com.lumi.assistant.debug 26 34 "$(cat ci/debug-cert.sha256 2>/dev/null || true)"
+
       - name: Upload debug APK
+        id: upload_apk
         uses: actions/upload-artifact@v7
         with:
           name: lumi-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish APK metadata
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          ARTIFACT_ID: ${{ steps.upload_apk.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.upload_apk.outputs.artifact-digest }}
+        run: bash .github/scripts/verify-apk.sh publish "APK metadata (${{ github.event_name }})"
 
       - name: Run Android lint
         if: always()
@@ -148,6 +163,7 @@ jobs:
         run: |
           ./gradlew :app:assembleRelease --stacktrace
           mkdir -p dist
+          bash .github/scripts/verify-apk.sh verify app/build/outputs/apk/release com.lumi.assistant 26 34
           cp app/build/outputs/apk/release/app-release.apk "dist/lumi-${GITHUB_REF_NAME//\//-}-release.apk"
 
       - name: Build debug APK for the release
